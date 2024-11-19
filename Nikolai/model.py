@@ -2,63 +2,73 @@ import torch
 from torch import nn
 
 
+
 class ScoreNetwork0(nn.Module):
     # takes an input image and time, returns the score function
-    def __init__(self, channels):
+    def __init__(self, dataset):
         super().__init__()
         chs = [32, 64, 128, 256, 256]
+        if dataset == "MNIST":
+            p = 1
+            c = 1
+        elif dataset == "CIFAR10":
+            p = 0
+            c = 3 
+        else:
+            raise ValueError("Invalid dataset, please input either 'MNIST' or 'CIFAR10'")
+        
         self._convs = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(channels+1, chs[0], kernel_size=3, padding=1),  # (batch, ch, 28, 28)
-                nn.LogSigmoid(),  # (batch, 8, 28, 28)
+                nn.Conv2d(c+1, chs[0], kernel_size=3, padding=1),  # (batch, 32, 32, 32)
+                nn.LogSigmoid(),  # (batch, 32, 32, 32)
             ),
             nn.Sequential(
-                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, ch, 14, 14)
-                nn.Conv2d(chs[0], chs[1], kernel_size=3, padding=1),  # (batch, ch, 14, 14)
-                nn.LogSigmoid(),  # (batch, 16, 14, 14)
+                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, 32, 16, 16)
+                nn.Conv2d(chs[0], chs[1], kernel_size=3, padding=1),  # (batch, 64, 16, 16)
+                nn.LogSigmoid(),  # (batch, 64, 16, 16)
             ),
             nn.Sequential(
-                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, ch, 7, 7)
-                nn.Conv2d(chs[1], chs[2], kernel_size=3, padding=1),  # (batch, ch, 7, 7)
-                nn.LogSigmoid(),  # (batch, 32, 7, 7)
+                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, 64, 8, 8)
+                nn.Conv2d(chs[1], chs[2], kernel_size=3, padding=1),  # (batch, 128, 8, 8)
+                nn.LogSigmoid(),  # (batch, 128, 8, 8)
             ),
             nn.Sequential(
-                nn.MaxPool2d(kernel_size=2, stride=2, padding=1),  # (batch, ch, 4, 4)
-                nn.Conv2d(chs[2], chs[3], kernel_size=3, padding=1),  # (batch, ch, 4, 4)
-                nn.LogSigmoid(),  # (batch, 64, 4, 4)
+                nn.MaxPool2d(kernel_size=2, stride=2, padding=p),  # (batch, 128, 4, 4)
+                nn.Conv2d(chs[2], chs[3], kernel_size=3, padding=1),  # (batch, 256, 4, 4)
+                nn.LogSigmoid(),  # (batch, 256, 4, 4)
             ),
             nn.Sequential(
-                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, ch, 2, 2)
-                nn.Conv2d(chs[3], chs[4], kernel_size=3, padding=1),  # (batch, ch, 2, 2)
-                nn.LogSigmoid(),  # (batch, 64, 2, 2)
+                nn.MaxPool2d(kernel_size=2, stride=2),  # (batch, 256, 2, 2)
+                nn.Conv2d(chs[3], chs[4], kernel_size=3, padding=1),  # (batch, 256, 2, 2)
+                nn.LogSigmoid(),  # (batch, 256, 2, 2)
             ),
         ])
         self._tconvs = nn.ModuleList([
             nn.Sequential(
                 # input is the output of convs[4]
-                nn.ConvTranspose2d(chs[4], chs[3], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, 64, 4, 4)
+                nn.ConvTranspose2d(chs[4], chs[3], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, 256, 4, 4)
                 nn.LogSigmoid(),
             ),
             nn.Sequential(
                 # input is the output from the above sequential concated with the output from convs[3]
-                nn.ConvTranspose2d(chs[3] * 2, chs[2], kernel_size=3, stride=2, padding=1, output_padding=0),  # (batch, 32, 7, 7)
+                nn.ConvTranspose2d(chs[3] * 2, chs[2], kernel_size=3, stride=2, padding=1, output_padding= 1-p),  # (batch, 128, 8, 8)
                 nn.LogSigmoid(),
             ),
             nn.Sequential(
                 # input is the output from the above sequential concated with the output from convs[2]
-                nn.ConvTranspose2d(chs[2] * 2, chs[1], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, chs[2], 14, 14)
+                nn.ConvTranspose2d(chs[2] * 2, chs[1], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, 64, 16, 16)
                 nn.LogSigmoid(),
             ),
             nn.Sequential(
                 # input is the output from the above sequential concated with the output from convs[1]
-                nn.ConvTranspose2d(chs[1] * 2, chs[0], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, chs[1], 28, 28)
+                nn.ConvTranspose2d(chs[1] * 2, chs[0], kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch, 32, 32, 32)
                 nn.LogSigmoid(),
             ),
             nn.Sequential(
                 # input is the output from the above sequential concated with the output from convs[0]
-                nn.Conv2d(chs[0] * 2, chs[0], kernel_size=3, padding=1),  # (batch, chs[0], 28, 28)
+                nn.Conv2d(chs[0] * 2, chs[0], kernel_size=3, padding=1),  # (batch, 32, 32, 32)
                 nn.LogSigmoid(),
-                nn.Conv2d(chs[0], channels, kernel_size=3, padding=1),  # (batch, 1, 28, 28)
+                nn.Conv2d(chs[0], c, kernel_size=3, padding=1),  # (batch, 3, 28, 28)
             ),
         ])
 
@@ -77,7 +87,5 @@ class ScoreNetwork0(nn.Module):
             else:
                 signal = torch.cat((signal, signals[-i]), dim=-3)
                 signal = tconv(signal)
-        # print(signal.shape)
-        # signal = torch.reshape(signal, (*signal.shape[:-3], -1))  # (..., 1 * 28 * 28)
-        # print(signal.shape)
+
         return signal
