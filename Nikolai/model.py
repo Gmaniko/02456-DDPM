@@ -10,16 +10,16 @@ class ScoreNetwork0(nn.Module):
         chs = [32, 64, 128, 256, 256]
         if dataset == "MNIST":
             p = 1
-            c = 1
+            self.dims = (1,28,28)
         elif dataset == "CIFAR10":
             p = 0
-            c = 3 
+            self.dims(3,32,32) 
         else:
             raise ValueError("Invalid dataset, please input either 'MNIST' or 'CIFAR10'")
         
         self._convs = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(c+1, chs[0], kernel_size=3, padding=1),  # (batch, 32, 32, 32)
+                nn.Conv2d(self.dims[0]+1, chs[0], kernel_size=3, padding=1),  # (batch, 32, 32, 32)
                 nn.LogSigmoid(),  # (batch, 32, 32, 32)
             ),
             nn.Sequential(
@@ -68,7 +68,7 @@ class ScoreNetwork0(nn.Module):
                 # input is the output from the above sequential concated with the output from convs[0]
                 nn.Conv2d(chs[0] * 2, chs[0], kernel_size=3, padding=1),  # (batch, 32, 32, 32)
                 nn.LogSigmoid(),
-                nn.Conv2d(chs[0], c, kernel_size=3, padding=1),  # (batch, 3, 28, 28)
+                nn.Conv2d(chs[0], self.dims[0], kernel_size=3, padding=1),  # (batch, 3, 28, 28)
             ),
         ])
 

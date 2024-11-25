@@ -1,16 +1,12 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import torch
 from torch import nn, Tensor
+import copy
 
 from model import ScoreNetwork0
 
 
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import RandomSampler
-from torchvision.datasets import MNIST, CIFAR10
 from torchvision.transforms import ToTensor
-from functools import reduce
 
 
 def preprocess(x):
@@ -78,7 +74,7 @@ def test_loop(dataloader: DataLoader, model: nn.Module, loss_fn: nn.MSELoss):
     # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
     # also serves to reduce unnecessary gradient computations and memory usage for tensors with requires_grad=True
     with torch.no_grad():
-        for X, y in dataloader:
+        for X, _ in dataloader:
             L = calc_loss(model, loss_fn, X.to(device))
             test_loss += L.item()
             # correct += (pred.argmax(1) == y).type(torch.float).sum().item()
@@ -87,18 +83,40 @@ def test_loop(dataloader: DataLoader, model: nn.Module, loss_fn: nn.MSELoss):
     # correct /= size
     print(f"Test Loss: {test_loss:>8f} \n")
 
+    return test_loss
 
 
 
-def train_ddpm(dataset, train_loader, test_loader, epochs, lr):
+
+
+def train_ddpm(dataset, train_loader, test_loader, epochs, lr, patience=10):
+    print("device: ", device)
     model = ScoreNetwork0(dataset).to(device)
     
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    best_loss = torch.inf 
+    best_model_weights = None
+
+
+
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train_loop(train_loader, model, loss_fn, optimizer)
-        test_loop(test_loader, model, loss_fn)
+        test_loss = test_loop(test_loader, model, loss_fn)
+
+        if test_loss < best_loss:
+            best_loss = test_loss
+            best_model_weights = copy.deepcopy(model.state_dict())  # Deep copy here      
+            patience = 10  # Reset patience counter
+        else:
+            patience -= 1
+            if patience == 0:
+                break
+
+    model.load_state_dict(best_model_weights)
+
     print("Done!")
 
     return model
