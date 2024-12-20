@@ -24,7 +24,7 @@ def get_loss(model, batch, ts, device,ap1,ap2):
 #This is done for T to 0 iterativly such that we end up with a completly denoised picture
 def backward_process(eps_pred,t,x,alpha,beta,ap,device):
     #Variance which is included to make sure the DDPM model is not deterministic in the sampling approach.
-    var = 0
+    var = torch.zeros_like(eps_pred).to(device)
     c1 = 1/alpha**0.5
     c2 = (1-alpha)/ap
     #The mean of the new picture (reparimzation trick)
