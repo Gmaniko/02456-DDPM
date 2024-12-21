@@ -1,6 +1,8 @@
+import os
 import torch
 from torch.nn.functional import mse_loss
-
+from torchvision.utils import save_image 
+from tqdm import tqdm
 
 #Inspired from ...
 def _cosine_schedule(T, s=0.008):
@@ -148,3 +150,13 @@ def reverse_process(eps_pred, t, X_t, beta, alpha, alpha_bar):
     return X_t
 
 
+@torch.no_grad()
+def generate_samples_todir(model, dataset_name, output_dir, var_params, num_samples, batch_size, device):
+    for i in tqdm(range(0, num_samples, batch_size)):
+        x0 = sampling(model, var_params, device,
+                      dataset_name, batch_size)
+        x0 = ((x0 + 1) / 2)
+        for j in range(x0.size(0)):
+            if j == 0:
+                print(f"{i}")
+            save_image(x0[j], os.path.join(output_dir, f"{i+j}.png"))
