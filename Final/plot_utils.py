@@ -1,36 +1,31 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-#Plot a single image either directly or as a part of a grid
+#Plot a single image
 @torch.no_grad()
-def plot_image(images, grid=False):
+def plot_image(img, ax):
     #print(images.shape)
-    images = torch.squeeze(images)
+    cmap = 'gray'
+    img = torch.squeeze(img)
     img = (img+1)/2 
-    img = torch.clamp(images,-1.0,1.0)
-    if len(images.shape) == 3:
-        plt.imshow(img.detach().cpu().permute(1,2,0).numpy())
-        plt.axis('off')
-    else:
-        plt.imshow(img.detach().cpu().numpy())
-        plt.axis('off')
-    if grid:
-        pass
-    else:
-        plt.show()
+    img = torch.clamp(img, 0.0, 1.0)
+    if len(img.shape) == 3:
+        cmap = None
+        img = img.permute(1,2,0)
+    ax.imshow(img.detach().cpu().numpy(), cmap=cmap)
+    ax.set_axis_off()
+    return ax
 
 #Plot grid of images.
 @torch.no_grad()
-def grid_plot(images):
-    figs = plt.figure(figsize=(10, 10))
-    row = int(len(images) ** (1 / 2))
-    col = round(len(images) / row)
-    index = 0
-    for r in range(row):
-        for c in range(col):
-            figs.add_subplot(row, col, index + 1)
-            if index < len(images):
-                plot_image(images[index], grid=True)
-                index += 1
+def grid_plot(images, grid_dim, fig_size):
+    rows, cols = grid_dim
+    if len(images) != rows*cols:
+      raise ValueError("Number of images does not match grid dimensions.")
     
-    plt.show()
+    fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=fig_size)
+    for r in range(rows):
+        for c in range(cols):
+            plot_image(images[r+c*cols], axs[r,c])
+    fig.tight_layout()
+    return fig, axs
