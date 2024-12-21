@@ -1,6 +1,5 @@
 
 import torch
-#Inspired from ...
 def cosine_schedule(T, s=0.008):
     y = torch.linspace(0,T, T+1)
     alphabar = torch.cos(((y / T)+s) / (1+s)*torch.pi*0.5)**2
