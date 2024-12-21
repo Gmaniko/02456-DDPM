@@ -3,6 +3,7 @@ from torch import nn, Tensor
 import copy
 
 from model import ScoreNetwork0
+from unet import UNet
 
 
 from torch.utils.data import DataLoader
@@ -25,25 +26,29 @@ alpha_bar = torch.cumprod(alpha, dim=0)
 
 def calc_loss(model: nn.Module, loss_fn: nn.MSELoss, x: Tensor) -> Tensor:
     t = torch.randint(0, T, size=(x.shape[0],1), device=device)
-    t = t[..., None, None].expand(*t.shape, *x.shape[-2:])
+    
     ab_t = alpha_bar[t]
+    ab_t = ab_t[..., None, None].expand(*t.shape, *x.shape[-2:])
     eps = torch.randn_like(x, device=device)
     s = torch.sqrt(ab_t)*x + torch.sqrt(1-ab_t)*eps
     out = model(s, t)
     return loss_fn(eps, out)
 
 
-def sampling(model: nn.Module):
-    data_dim = model.dims
-    x = torch.randn(size=data_dim, device=device)
-    for t in range(T-1, -1, -1):
-        z = torch.randn(size=data_dim) if t > 0 else torch.zeros(size=data_dim)
-        z = z.to(device)
-        t_tensor = t*torch.ones_like(x, device=device)
-        out = model(x, t_tensor)
-        sd = torch.sqrt(beta[t])
-        x = 1/torch.sqrt(alpha[t])*(x - beta[t]/torch.sqrt(1-alpha_bar[t])*out) + sd*z
-    return x
+
+
+def sampling(model: nn.Module, latent: Tensor):
+    with torch.no_grad():
+        x = latent.to(device=device)
+        data_dim = x.size()
+        for t in range(T-1, -1, -1):
+            z = torch.randn(size=data_dim) if t > 0 else torch.zeros(size=data_dim)
+            z = z.to(device)
+            out = model(x, t*torch.ones(data_dim[0], device=device, dtype=torch.int))
+            sd = torch.sqrt(beta[t])
+            x = 1/torch.sqrt(alpha[t])*(x - beta[t]/torch.sqrt(1-alpha_bar[t])*out) + sd*z
+    return x.detach().cpu().numpy()
+
 
 def train_loop(dataloader: DataLoader, model: nn.Module, loss_fn: nn.MSELoss, optimizer):
     size = len(dataloader.dataset)
@@ -91,7 +96,14 @@ def test_loop(dataloader: DataLoader, model: nn.Module, loss_fn: nn.MSELoss):
 
 def train_ddpm(dataset, train_loader, test_loader, epochs, lr, patience=10):
     print("device: ", device)
-    model = ScoreNetwork0(dataset).to(device)
+    # model = ScoreNetwork0(dataset).to(device)
+    if dataset=="MNIST":
+        nch = 1
+    elif dataset=="CIFAR10":
+        nch = 3
+    else:
+        raise ValueError("")
+    model = UNet(nch).to(device)
     
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)

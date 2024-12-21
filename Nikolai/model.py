@@ -73,6 +73,7 @@ class ScoreNetwork0(nn.Module):
         ])
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        t = t[..., None, None].expand(*t.shape, *x.shape[-2:])
         xt = torch.cat((x, t), dim=-3)
         signal = xt
         signals = []
